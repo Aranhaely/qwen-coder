@@ -1,0 +1,41 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: myapp
+nameSuffix: -dev
+
+resources:
+  - ../../base
+
+replicas:
+  - name: myapp
+    count: 1
+
+patches:
+  # dev: single replica -> PDB minAvailable must drop to 1
+  - patch: |-
+      apiVersion: policy/v1
+      kind: PodDisruptionBudget
+      metadata:
+        name: myapp
+      spec:
+        minAvailable: 1
+  # dev: relax HPA bounds
+  - patch: |-
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: myapp
+      spec:
+        minReplicas: 1
+        maxReplicas: 4
+
+images:
+  - name: ghcr.io/OWNER/REPO
+    newTag: dev-latest
+
+configMapGenerator:
+  - name: myapp-config
+    literals:
+      - LOG_LEVEL=debug
+      - ENVIRONMENT=dev

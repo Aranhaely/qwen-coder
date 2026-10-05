@@ -1,0 +1,48 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: myapp
+
+resources:
+  - ../../base
+
+replicas:
+  - name: myapp
+    count: 3
+
+patches:
+  # prod: stricter HPA + topology spread required (not best-effort)
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: myapp
+      spec:
+        template:
+          spec:
+            topologySpreadConstraints:
+              - maxSkew: 1
+                topologyKey: topology.kubernetes.io/zone
+                whenUnsatisfiable: DoNotSchedule
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: myapp
+  - patch: |-
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: myapp
+      spec:
+        minReplicas: 3
+        maxReplicas: 50
+
+images:
+  - name: ghcr.io/OWNER/REPO
+    # CI pins digest: ghcr.io/OWNER/REPO@sha256:... for supply-chain safety
+    newTag: PLACEHOLDER_TAG
+
+configMapGenerator:
+  - name: myapp-config
+    literals:
+      - LOG_LEVEL=info
+      - ENVIRONMENT=prod
